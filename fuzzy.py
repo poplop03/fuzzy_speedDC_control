@@ -15,41 +15,51 @@ def triangle(x, a, b, c):
     else:
         return (c - x) / (c - b)
 
-# Membership function parameters (adjust here!)
-LOW_PARAMS = (-100, -50, 0)
-MID_PARAMS = (-50, 0, 50)
-HIGH_PARAMS = (0, 50, 100)
+def trapezoid(x, a, b, c, d):
+    if x <= a or x >= d:
+        return 0.0
+    elif b <= x <= c:
+        return 1.0
+    elif a < x < b:
+        return (x - a) / (b - a)
+    elif c < x < d:
+        return (d - x) / (d - c)
 
-# PWM output values for each rule (adjust here!)
-PWM_LOW = 80
-PWM_MID = 150
-PWM_HIGH = 230
+
+# Membership function parameters
+LOW_PARAMS_TRAP  = (-999, -300, -150, 0)
+MID_PARAMS_TRI   = (-150, 0, 150)
+HIGH_PARAMS_TRAP = (0, 150, 300, 999)
+
+# Output PWM values
+PWM_LOW = 50
+PWM_MID = 95
+PWM_HIGH = 150
 
 # Fuzzy controller
 def fuzzy_controller(error):
-    mu_low = triangle(error, *LOW_PARAMS)
-    mu_mid = triangle(error, *MID_PARAMS)
-    mu_high = triangle(error, *HIGH_PARAMS)
-    
+    mu_low = trapezoid(error, *LOW_PARAMS_TRAP)
+    mu_mid = triangle(error, *MID_PARAMS_TRI)
+    mu_high = trapezoid(error, *HIGH_PARAMS_TRAP)
+
+    print(f"mu_low: {mu_low:.2f}, mu_mid: {mu_mid:.2f}, mu_high: {mu_high:.2f}")  # Optional debug
+
     numerator = (mu_low * PWM_LOW) + (mu_mid * PWM_MID) + (mu_high * PWM_HIGH)
     denominator = mu_low + mu_mid + mu_high
-    
-    if denominator == 0:
-        pwm_output = 0
-    else:
-        pwm_output = numerator / denominator
 
+    pwm_output = numerator / denominator if denominator != 0 else 0
     pwm_output = max(0, min(255, int(pwm_output)))
     return pwm_output
 
-# Serial communication
-ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)  # Change port as needed
+
+# Serial setup
+ser = serial.Serial('/dev/ttyUSB1', 9600, timeout=1)  # Adjust port if needed
 time.sleep(2)
 
-# Desired speed (adjustable!)
-desired_speed = 200.0
+# Desired RPM
+desired_speed = 50
 
-# Plot settings
+# Plot setup
 window_size = 100
 speed_data = deque([0.0]*window_size, maxlen=window_size)
 desired_data = deque([desired_speed]*window_size, maxlen=window_size)
@@ -64,42 +74,44 @@ ax.set_ylabel('Speed (RPM)')
 ax.legend()
 ax.grid(True)
 
-# Main loop
+# Main loop (without try-except)
 try:
     while True:
         line = ser.readline().decode('utf-8').strip()
-        if line:
-            try:
-                current_speed = float(line)
-                print(f"Current speed: {current_speed:.2f} RPM")
+        if line != '':
+            current_speed = float(line)
 
-                error = desired_speed - current_speed
-                pwm_value = fuzzy_controller(error)
-                print(f"Sending PWM: {pwm_value}")
+            print(f"Current speed: {current_speed:.2f} RPM")
 
-                ser.write(bytes([pwm_value]))
+            error = desired_speed - current_speed
+            print(f"Error: {error:.2f} RPM")
 
-                # Update plot
-                speed_data.append(current_speed)
-                desired_data.append(desired_speed)
-                time_data.append(time_data[-1] + 1)
+            pwm_value = fuzzy_controller(error)
+            print(f"Sending PWM: {pwm_value}")
 
-                line1.set_ydata(speed_data)
-                line2.set_ydata(desired_data)
-                line1.set_xdata(time_data)
-                line2.set_xdata(time_data)
-                ax.relim()
-                ax.autoscale_view()
-                plt.pause(0.01)
+            ser.write(bytes([pwm_value]))
 
-                time.sleep(0.1)
+            # Update plot data
+            speed_data.append(current_speed)
+            desired_data.append(desired_speed)
+            time_data.append(time_data[-1] + 1)
 
-            except ValueError:
-                pass
+            line1.set_ydata(speed_data)
+            line2.set_ydata(desired_data)
+            line1.set_xdata(time_data)
+            line2.set_xdata(time_data)
+            ax.relim()
+            ax.autoscale_view()
+            plt.pause(0.01)
+
+        time.sleep(0.1)
+
 
 except KeyboardInterrupt:
-    print("Stopping...")
+    print("\nKeyboardInterrupt detected. Stopping motor...")
+    ser.write(bytes([0]))  # Send PWM = 0
+    time.sleep(0.2)        # Give Arduino time to respond
     ser.close()
     plt.ioff()
     plt.show()
-
+    print("Program terminated.")
