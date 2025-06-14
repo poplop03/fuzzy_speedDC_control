@@ -14,7 +14,7 @@ def triangle(x, a, b, c):
         return (x - a) / (b - a)
     else:
         return (c - x) / (c - b)
-
+# Trap membership function
 def trapezoid(x, a, b, c, d):
     if x <= a or x >= d:
         return 0.0
@@ -27,14 +27,14 @@ def trapezoid(x, a, b, c, d):
 
 
 # Membership function parameters
-LOW_PARAMS_TRAP  = (-999, -300, -150, 0)
+LOW_PARAMS_TRAP  = (-999, -200, -150, 0)
 MID_PARAMS_TRI   = (-150, 0, 150)
-HIGH_PARAMS_TRAP = (0, 150, 300, 999)
+HIGH_PARAMS_TRAP = (0, 150, 200, 999)
 
 # Output PWM values
 PWM_LOW = 50
-PWM_MID = 95
-PWM_HIGH = 150
+PWM_MID = 100
+PWM_HIGH = 180
 
 # Fuzzy controller
 def fuzzy_controller(error):
@@ -53,11 +53,11 @@ def fuzzy_controller(error):
 
 
 # Serial setup
-ser = serial.Serial('/dev/ttyUSB1', 9600, timeout=1)  # Adjust port if needed
+ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)  # Adjust port if needed
 time.sleep(2)
 
 # Desired RPM
-desired_speed = 50
+desired_speed = 40
 
 # Plot setup
 window_size = 100
